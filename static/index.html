@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Türk Hukuku AI Asistanı</title>
+
+<!-- marked.js: LLM'in markdown formatındaki (kalın yazı, tablo vb.)
+     cevabını okunaklı HTML'e çeviriyor. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<!-- DOMPurify: marked.js'in ürettiği HTML'i EKRANA BASMADAN ÖNCE temizler.
+     Bu link herkese açık olacağı için, LLM çıktısında (kasıtlı ya da
+     kasıtsız) HTML/script içeriği olsa bile zararsız hale getirilir. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2e38;
+    --text: #e8e9ec;
+    --muted: #9aa0ae;
+    --accent: #4f8cff;
+    --accent-dim: #2c4a86;
+    --error: #ff6b6b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .subtitle { color: var(--muted); font-size: 0.92rem; }
+  .disclaimer {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #1c1408;
+    color: #e0b95c;
+    font-size: 0.85rem;
+  }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .example-chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .example-chip:hover { border-color: var(--accent); color: var(--text); }
+
+  form { display: flex; gap: 10px; align-items: flex-end; }
+  textarea {
+    flex: 1;
+    resize: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    min-height: 52px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 0 20px;
+    height: 52px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:disabled { background: var(--accent-dim); cursor: not-allowed; }
+
+  .result { margin-top: 28px; }
+  .loading {
+    color: var(--muted);
+    font-size: 0.9rem;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .loading.active { display: flex; }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--error);
+    border-radius: var(--radius);
+    background: #2a1414;
+    color: var(--error);
+    font-size: 0.9rem;
+  }
+  .error-box.active { display: block; }
+
+  .answer-box {
+    display: none;
+    margin-top: 16px;
+    padding: 18px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .answer-box.active { display: block; }
+  .answer-box :first-child { margin-top: 0; }
+  .answer-box :last-child { margin-bottom: 0; }
+  .answer-box table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .answer-box th, .answer-box td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.9rem;
+  }
+  .answer-box th { background: #1e222b; }
+
+  .sources { margin-top: 16px; display: none; }
+  .sources.active { display: block; }
+  .sources-title { color: var(--muted); font-size: 0.82rem; margin-bottom: 8px; }
+  .source-item {
+    font-size: 0.82rem;
+    color: var(--muted);
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .source-item .path { color: var(--text); }
+  .source-item .distance { float: left; margin-left: 8px; opacity: 0.7; }
+
+  footer {
+    margin-top: 48px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚖️ Türk Hukuku AI Asistanı</h1>
+    <div class="subtitle">
+      TCK (5237), TMK (4721) ve TBK (6098) maddelerine dayalı bir RAG
+      prototipi. Retrieval + LLM üretimi + halüsinasyon denetimi (LangGraph).
+    </div>
+    <div class="disclaimer">
+      ⚠️ Bu bir prototip/portfolyo projesidir. Verilen cevaplar hukuki
+      tavsiye yerine geçmez - gerçek bir hukuki konuda mutlaka bir avukata
+      danışın.
+    </div>
+  </header>
+
+  <div class="examples" id="examples">
+    <div class="example-chip">Kasten adam öldürmenin cezası nedir?</div>
+    <div class="example-chip">Bir kişinin hak ehliyeti ne zaman başlar?</div>
+    <div class="example-chip">Vekaletsiz iş görme nedir?</div>
+  </div>
+
+  <form id="soru-form">
+    <textarea id="soru-input" placeholder="Bir hukuki soru yaz..." required></textarea>
+    <button type="submit" id="submit-btn">Sor</button>
+  </form>
+
+  <div class="result">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <span>Aranıyor ve cevap üretiliyor... (ilk istek modelin ısınması nedeniyle biraz sürebilir)</span>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div class="answer-box" id="answer-box"></div>
+
+    <div class="sources" id="sources">
+      <div class="sources-title">Kaynaklar</div>
+      <div id="sources-list"></div>
+    </div>
+  </div>
+
+  <footer>
+    Kaynak kod: bu proje bir LangGraph + RAG + pgvector prototipidir.
+  </footer>
+</div>
+
+<script>
+const form = document.getElementById("soru-form");
+const input = document.getElementById("soru-input");
+const submitBtn = document.getElementById("submit-btn");
+const loading = document.getElementById("loading");
+const errorBox = document.getElementById("error-box");
+const answerBox = document.getElementById("answer-box");
+const sources = document.getElementById("sources");
+const sourcesList = document.getElementById("sources-list");
+const examples = document.getElementById("examples");
+
+examples.addEventListener("click", (e) => {
+  if (e.target.classList.contains("example-chip")) {
+    input.value = e.target.textContent;
+    input.focus();
+  }
+});
+
+function resetResult() {
+  errorBox.classList.remove("active");
+  answerBox.classList.remove("active");
+  sources.classList.remove("active");
+  errorBox.textContent = "";
+  answerBox.innerHTML = "";
+  sourcesList.innerHTML = "";
+}
+
+function showError(message) {
+  errorBox.textContent = message;
+  errorBox.classList.add("active");
+}
+
+function renderAnswer(markdownText) {
+  // marked.js ile markdown -> HTML, DOMPurify ile HTML'i temizleyip
+  // ancak ONDAN SONRA ekrana basıyoruz (XSS'e karşı).
+  const rawHtml = marked.parse(markdownText);
+  const cleanHtml = DOMPurify.sanitize(rawHtml);
+  answerBox.innerHTML = cleanHtml;
+  answerBox.classList.add("active");
+}
+
+function renderSources(kaynaklar) {
+  if (!kaynaklar || kaynaklar.length === 0) return;
+  kaynaklar.forEach((k) => {
+    const div = document.createElement("div");
+    div.className = "source-item";
+    div.innerHTML =
+      `<span class="path">${DOMPurify.sanitize(k.context_path)}</span>` +
+      `<div class="distance">mesafe: ${k.mesafe.toFixed(3)}</div>`;
+    sourcesList.appendChild(div);
+  });
+  sources.classList.add("active");
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const soru = input.value.trim();
+  if (!soru) return;
+
+  resetResult();
+  loading.classList.add("active");
+  submitBtn.disabled = true;
+
+  try {
+    const response = await fetch("/soru", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soru, top_k: 5 }),
+    });
+
+    if (response.status === 429) {
+      const data = await response.json();
+      showError(data.detail || "Çok fazla istek gönderildi, lütfen biraz bekleyip tekrar dene.");
+    } else if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      showError(data.detail || "Bir hata oluştu, lütfen tekrar dene.");
+    } else {
+      const data = await response.json();
+      renderAnswer(data.cevap);
+      renderSources(data.kaynaklar);
+    }
+  } catch (err) {
+    showError("Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.");
+  } finally {
+    loading.classList.remove("active");
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

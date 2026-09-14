@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: hukuk_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hukuk
+      POSTGRES_PASSWORD: hukuk
+      POSTGRES_DB: hukuk_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - hukuk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hukuk -d hukuk_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # NOT: Bu servis eskiden yoktu - `docker-compose up` sadece veritabanını
+  # ayağa kaldırıyor, Dockerfile hiçbir yerde referans edilmiyordu. Ingestion
+  # (madde_chunker.py + ingestion_pipeline.py) hâlâ ayrı/manuel çalıştırılmalı
+  # (Dockerfile bu dosyaları imaja hiç kopyalamıyor) - ama API artık compose
+  # ile birlikte ayağa kalkabiliyor.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hukuk_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://hukuk:hukuk@postgres:5432/hukuk_db
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY .env dosyasında tanımlı olmalı}
+      PORT: "10000"
+    ports:
+      - "10000:10000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  hukuk_pgdata:
