@@ -208,18 +208,6 @@ Rate limit aşıldığında veya Groq günlük kotası dolduğunda sırasıyla
 `429` ve `503` durum kodları, kullanıcı dostu Türkçe hata mesajlarıyla
 döner.
 
-## Değerlendirme (evaluation)
-
-```bash
-python evaluation.py --testset testset.json --output eval_results.json --top-k 5
-```
-
-Her test sorusu için kapsam içi sorularda **retrieval isabet oranı**
-(beklenen maddenin getirilip getirilmediği), kapsam dışı sorularda ise
-**doğru red oranı** (sistemin "bilmiyorum" deyip demediği) hesaplanır.
-Sonuçlar her soru sonrası diske yazılır; Groq günlük kotası dolarsa
-koşu o ana kadarki sonuçlarla birlikte güvenli şekilde durur.
-
 ## Notlar / Bilinen sınırlar
 
 - Kapsam sadece TCK, TMK ve TBK ile sınırlıdır; başka kanunlarla ilgili
